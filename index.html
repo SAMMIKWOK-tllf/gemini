@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Café 海報指令製造機</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<style>
+/* Layout idea: three big tabs (1st poster, 2nd poster, hand in); choices on the left, live prompt on the right, a sticky action bar at the bottom. */
+:root{
+  --bg:#F2F6FF; --ink:#14213D; --muted:#5B6A8C; --card:#FFFFFF; --line:#D3DCF2;
+  --accent:#2F5BFF; --accent-ink:#FFFFFF; --pop:#FFB400; --good:#0E8F48; --warn:#C2410C; --soft:#E6EDFF; --mark:#FFE58A; --mark-ink:#3A2B00;
+  --font:'Noto Sans TC','PingFang HK','Microsoft JhengHei',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1326; --ink:#EAF0FF; --muted:#9AA8CC; --card:#182041; --line:#2B3662;
+    --accent:#7C9BFF; --accent-ink:#0E1326; --pop:#FFC93C; --good:#4ADE80; --warn:#FF9A62; --soft:#222C57; --mark:#6B5200; --mark-ink:#FFF3C4; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1326; --ink:#EAF0FF; --muted:#9AA8CC; --card:#182041; --line:#2B3662;
+  --accent:#7C9BFF; --accent-ink:#0E1326; --pop:#FFC93C; --good:#4ADE80; --warn:#FF9A62; --soft:#222C57; --mark:#6B5200; --mark-ink:#FFF3C4; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:19px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding:16px 16px 0}
+h1{font-size:32px;font-weight:900;margin:0 0 4px;line-height:1.2;text-wrap:balance}
+.sub{margin:0 0 14px;color:var(--muted);font-size:17px}
+.tabs{display:flex;gap:10px;margin-bottom:16px}
+.tab{flex:1;font:inherit;font-size:19px;font-weight:700;color:var(--ink);background:var(--card);border:3px solid var(--line);border-radius:16px;padding:10px 8px;min-height:56px;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.tab .tick{display:inline-block;min-width:1.2em}
+.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:20px;align-items:start}
+.col{display:flex;flex-direction:column;gap:14px}
+.step{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.step.done{border-color:var(--good)}
+.step h2{margin:0;font-size:21px;font-weight:900;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.step h2 .cnt{font-size:16px;font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+.step.done h2::after{content:"✔";color:var(--good);margin-left:auto}
+.badge{font-size:14px;font-weight:700;background:var(--pop);color:#2B2100;border-radius:999px;padding:2px 10px}
+.hint{margin:0;color:var(--muted);font-size:16px}
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip{font:inherit;font-size:18px;font-weight:500;color:var(--ink);background:var(--soft);border:2px solid transparent;border-radius:14px;padding:8px 14px;cursor:pointer;min-height:48px;text-align:left}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input[type=text]{font:inherit;font-size:18px;color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:8px 14px;min-height:48px;flex:1 1 180px;min-width:0}
+input[type=text]::placeholder{color:var(--muted)}
+.btn{font:inherit;font-size:18px;font-weight:700;border-radius:12px;border:2px solid var(--accent);background:var(--accent);color:var(--accent-ink);padding:8px 18px;cursor:pointer;min-height:48px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:hover{filter:brightness(1.08)}
+:focus-visible{outline:3px solid var(--pop);outline-offset:2px}
+.panel{position:sticky;top:12px;background:var(--card);border:3px solid var(--accent);border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.panel h2{margin:0;font-size:21px;font-weight:900}
+.box{font:inherit;font-size:19px;line-height:1.75;background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:12px 14px;min-height:200px;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+mark{background:var(--mark);color:var(--mark-ink);border-radius:6px;padding:1px 4px}
+mark.lock{outline:2px dashed var(--muted)}
+.legend{font-size:15px;color:var(--muted)}
+.notice{background:var(--soft);border-radius:12px;padding:10px 14px;font-size:16px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.notice[hidden]{display:none}
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:17px}
+.checks li{display:flex;gap:8px}
+.checks .ok{color:var(--good)} .checks .bad{color:var(--warn)}
+.checks .mark{width:1.4em;font-weight:900;flex:none;background:none;color:inherit;padding:0}
+.win{background:var(--pop);color:#2B2100;border-radius:12px;padding:10px 14px;font-weight:700}
+.win[hidden]{display:none}
+.bar{position:sticky;bottom:0;z-index:5;margin:16px -16px 0;background:var(--card);border-top:3px solid var(--accent);padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.prog{display:flex;flex-direction:column;gap:2px;min-width:160px;font-weight:700}
+.meter{height:10px;width:200px;max-width:40vw;background:var(--soft);border-radius:999px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--good);width:0;transition:width .25s}
+.bar .acts{display:flex;gap:10px;flex-wrap:wrap}
+.toast{font-weight:700;color:var(--good);min-height:1.5em}
+.steps3{counter-reset:s;list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.steps3 li{counter-increment:s;display:flex;gap:14px;align-items:center;background:var(--soft);border-radius:14px;padding:12px 16px;font-size:20px}
+.steps3 li::before{content:counter(s);flex:none;width:44px;height:44px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-weight:900;display:grid;place-items:center}
+.sentence{font-size:22px;font-weight:700;line-height:1.7}
+.sentence u{text-decoration:none;border-bottom:3px solid var(--pop);padding:0 4px}
+.top{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+@media (max-width:920px){
+  .grid{grid-template-columns:1fr}
+  .panel{position:static}
+  h1{font-size:27px}
+}
+@media (prefers-reduced-motion:reduce){.meter i{transition:none}}
+
+.dock{position:sticky;top:0;z-index:6;background:var(--bg);padding:8px 0 10px;border-bottom:2px solid var(--line);margin-bottom:14px}
+.dockbox{background:var(--card);border:3px solid var(--accent);border-radius:16px;padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.dockhead{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+.dockhead strong{font-size:21px;font-weight:900}
+.dockhead .cntb{font-weight:700;color:var(--muted);font-size:16px;font-variant-numeric:tabular-nums}
+.dockhead .acts{display:flex;gap:8px;flex-wrap:wrap}
+.dockhead .btn{min-height:44px;padding:6px 14px;font-size:17px}
+.box{min-height:84px;max-height:28vh;overflow:auto;font-size:20px}
+.warn{color:var(--warn);font-weight:700;font-size:16px}
+.warn:empty{display:none}
+.dots{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.dot{font:inherit;font-size:18px;font-weight:900;width:48px;height:48px;border-radius:50%;border:3px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer}
+.dot.done{background:var(--good);border-color:var(--good);color:#fff}
+.dot.part{background:var(--pop);border-color:var(--pop);color:#2B2100}
+.dot.cur{outline:4px solid var(--accent);outline-offset:2px}
+.q{background:var(--card);border:3px solid var(--line);border-radius:20px;padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.q h2{margin:0;font-size:25px;font-weight:900;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.q .stepno{background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:2px 14px;font-size:18px}
+.q .cnt{font-size:18px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.q .chip{font-size:20px;min-height:56px;padding:10px 18px}
+.nav{display:flex;gap:12px;justify-content:space-between;margin-top:14px}
+.nav .btn{min-width:140px;min-height:56px;font-size:20px}
+.nav .btn[disabled]{opacity:.35;cursor:default}
+.sum{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.sum li{display:flex;gap:10px;align-items:center;background:var(--soft);border-radius:12px;padding:8px 12px;font-size:18px}
+.sum li .l{font-weight:700;flex:none;min-width:7em}
+.sum li .vv{flex:1;min-width:0;overflow-wrap:anywhere}
+.sum li.skip .vv{color:var(--muted)}
+.sum li .btn{min-height:40px;padding:2px 12px;font-size:16px}
+@media (max-width:920px){.box{max-height:24vh}}
+.q .chip{font-size:17px;min-height:44px;padding:6px 14px;border-radius:12px}
+.q input[type=text]{font-size:22px;min-height:64px;padding:12px 16px;border:3px solid var(--accent);border-radius:14px}
+.q .writelab{font-weight:700;font-size:18px;margin:0}
+.q .row .btn{min-height:64px}
+.box{min-height:150px;max-height:38vh}
+.btn.lock{border-style:dashed}
+@media (max-width:920px){.box{max-height:34vh}}
+.hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.hdr h1{margin:0 0 4px}
+.tg{font:inherit;font-size:22px;min-width:48px;min-height:48px;border-radius:12px;border:2px dashed var(--line);background:transparent;color:var(--muted);opacity:.55;cursor:pointer}
+.tg:hover{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr"><h1>☕ Café 海報指令製造機</h1><button class="tg" type="button" id="adv" aria-label="切換進階" title="">🔒</button></div>
+  <p class="sub">一步一步揀,指令會慢慢變長。揀完複製,貼去 Gemini。唔使打字!</p>
+
+  <div class="dock" id="dock">
+    <div class="dockbox">
+      <div class="dockhead">
+        <strong>你嘅指令</strong><span class="cntb" id="dcount"></span>
+        <div class="acts">
+          <button class="btn" type="button" id="copy">📋 複製指令</button>
+          <a class="btn ghost" href="https://gemini.google.com/app" target="_blank" rel="noopener">去 Gemini ↗</a>
+        </div>
+      </div>
+      <div class="box" id="box" contenteditable="true" role="textbox" aria-multiline="true" aria-label="指令欄,可以改字"></div>
+      <div class="legend" id="legend" hidden>黃色 = 進階指示</div>
+      <div class="notice" id="dirty" hidden><span>你改過字,再撳選項唔會蓋過。</span><button class="btn ghost" type="button" id="rebuild">用最新選擇重新砌過</button></div>
+      <div class="warn" id="warn" role="alert"></div>
+      <div class="toast" id="toast" role="status"></div>
+    </div>
+  </div>
+
+  <div id="wizard">
+    <div class="top"><button class="btn ghost" type="button" id="ex">✨ 用範例試下</button><button class="btn ghost" type="button" id="reset">全部重來</button></div>
+    <div class="dots" id="dots"></div>
+    <section class="q" id="q"></section>
+    <div class="nav"><button class="btn ghost" type="button" id="prev">← 上一步</button><button class="btn" type="button" id="next">下一步 →</button></div>
+  </div>
+</div>
+
+<script>
+
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const O = (v, e, l) => ({v, e: e || '', l: l || v});
+
+const F1 = [
+  {key:'name', seg:'name', label:'Café 名字', icon:'🏷️', type:'single', ph:'自己寫店名(可以由工作紙複製)',
+   opts:['TLLF Café','陽光貓狗咖啡室','海風咖啡室','星期天咖啡室','小熊咖啡店'].map(v=>O(v))},
+  {key:'store', seg:'store', label:'店內設計風格及特色', icon:'🪑', type:'single', ph:'自己寫風格',
+   opts:['海邊度假風','文青木系風','設有貓狗互動區','日式簡約風','復古茶餐廳風','森林綠植風'].map(v=>O(v))},
+  {key:'logo', seg:'logo', label:'商標圖案', icon:'🎨', type:'multi', need:3, ph:'自己加一個圖案', hint:'揀 3 個圖案放入商標',
+   opts:['太陽花','貓','狗','咖啡杯','咖啡豆','月亮','小鳥','愛心','樹葉'].map(v=>O(v))},
+  {key:'hours', seg:'hours', label:'開放時間', icon:'🕒', type:'single', ph:'自己寫時間',
+   opts:['星期一至日 11:00 - 18:00','星期一至五 08:00 - 17:00','星期六日 10:00 - 20:00'].map(v=>O(v))},
+  {key:'drinks', seg:'menu', label:'特色飲品', icon:'🥤', type:'multi', need:2, ph:'自己加一款飲品', hint:'揀 2 款飲品',
+   opts:['海鹽焦糖鮮奶咖啡','芒果沙冰','凍檸檬茶','抹茶拿鐵','熱朱古力','蜂蜜柚子茶'].map(v=>O(v))},
+  {key:'foods', seg:'menu', label:'特色食物', icon:'🥐', type:'multi', need:2, ph:'自己加一款食物', hint:'揀 2 款食物',
+   opts:['士多啤梨牛角包','寵物友善小蛋糕','蛋撻','芝士蛋糕','窩夫','三文治'].map(v=>O(v))},
+  {key:'promo', seg:'promo', label:'優惠內容(促銷方法 + 標語)', icon:'📣', type:'single', ph:'自己寫優惠內容',
+   opts:['陽光與毛孩相伴，全場飲品買一送一！','消費滿 $100 送抽獎券，有機會贏咖啡杯一個！','中學生憑學生證，飲品半價！','集齊 8 個印花，免費飲一杯！'].map(v=>O(v))}
+];
+const F2 = [
+  {key:'aud', ph:'自己寫:賣俾邊個?', label:'目標顧客', icon:'👥', type:'single', fix:'aud', hint:'賣俾邊個?AI 就知道用咩口味',
+   opts:['中學生／年青人','上班族','親子家庭','寵物主人','遊客'].map(v=>O(v))},
+  {key:'art', ph:'自己寫:想要咩畫風?', label:'畫風', icon:'🖌️', type:'single', fix:'art', hint:'相片?插畫?水彩?',
+   opts:[O('可愛手繪插畫','🐻'),O('真實相片感','📷'),O('簡約扁平設計','🟦'),O('水彩畫風格','🎨'),O('復古海報風','📻'),O('日系清新風','🌿')]},
+  {key:'color', ph:'自己寫:想要咩顏色?', label:'主色', icon:'🌈', type:'single', fix:'color', hint:'顏色統一,海報就靚啲',
+   opts:[O('暖黃色同白色','🟨'),O('天藍色同白色','🟦'),O('粉紅色同奶白色','🌸'),O('啡色同米色','🟫'),O('綠色同奶白色','🟩'),O('黑色同金色','⬛')]},
+  {key:'layout', ph:'自己寫:邊度放咩?', label:'版面', icon:'📐', type:'single', fix:'layout', hint:'邊度放標語、邊度放資料',
+   opts:[O('標語放最上面用大字，飲品食物放中間，開放時間放底部','⬆️','標語喺上,餐點喺中,時間喺下'),
+         O('圖案放左邊，文字放右邊','↔️','左圖右字'),
+         O('標語放中間用大字，四周圍住圖案','🎯','標語喺中間,圖案圍住')]},
+  {key:'text', ph:'自己加一個文字要求', label:'文字要求', icon:'🔤', type:'multi', need:2, fix:'text', hint:'揀至少 2 個,減少亂碼同錯字',
+   opts:['全部文字用繁體中文','字要大同清楚','標語放最當眼處','唔好有亂碼或錯字'].map(v=>O(v))},
+  {key:'size', ph:'自己寫:要幾大?', label:'尺寸', icon:'📏', type:'single', fix:'size', hint:'用喺邊度?',
+   opts:[O('A4 直向(貼壁報板)','📄'),O('正方形(IG 帖文)','⬜'),O('手機直式(Story)','📱')]}
+];
+
+const ALL = F1.concat(F2.map(f => Object.assign({adv:true}, f)));
+const S = {name:'',store:'',logo:[],hours:'',drinks:[],foods:[],promo:'',aud:'',art:'',color:'',layout:'',text:[],size:''};
+let cur = 0, dirty = false, saved = '', advTimer = null, advOn = false;
+const LIST = () => advOn ? ALL : ALL.filter(f => !f.adv);
+
+function has(f){ return f.type === 'multi' ? S[f.key].length > 0 : !!S[f.key]; }
+function isDone(f){ return f.type === 'multi' ? S[f.key].length >= f.need : !!S[f.key]; }
+function toggleIn(arr, v, max){
+  const i = arr.indexOf(v);
+  if (i >= 0){ arr.splice(i,1); return 'off'; }
+  if (arr.length >= max){ flash('最多揀 ' + max + ' 個,先取消一個啦', true); return 'full'; }
+  arr.push(v); return 'on';
+}
+
+function p1Parts(){
+  const P = [];
+  if (S.name) P.push('有「' + S.name + '」這個店名');
+  if (S.logo.length) P.push('商標圖案有' + S.logo.join('、'));
+  if (S.store) P.push('店內設計風格：' + S.store);
+  if (S.hours) P.push('開放時間：' + S.hours);
+  const m = S.drinks.concat(S.foods);
+  if (m.length) P.push('推介' + m.join('、'));
+  if (S.promo) P.push('優惠內容：' + S.promo);
+  return P;
+}
+function p1Text(){
+  const P = p1Parts();
+  const last = P.length ? P[P.length-1] : '';
+  return '設計一張推廣海報' + P.map(t => '，' + t).join('') + (/[！？。]$/.test(last) ? '' : '。');
+}
+function addLines(){
+  const L = [];
+  if (S.aud) L.push('目標顧客：' + S.aud + '。');
+  if (S.art) L.push('畫風：' + S.art + '。');
+  if (S.color) L.push('主色：' + S.color + '。');
+  if (S.layout) L.push('版面：' + S.layout + '。');
+  if (S.text.length) L.push('文字：' + S.text.join('，') + '。');
+  if (S.size) L.push('尺寸：' + S.size + '。');
+  return L;
+}
+function promptHtml(){
+  const lines = advOn ? addLines() : [];
+  return esc(p1Text()) + lines.map(l => '<br><mark>' + esc(l) + '</mark>').join('') +
+    (lines.length ? '<br><mark class="lock">不要抄襲現有品牌商標。</mark>' : '');
+}
+const textOf = el => el.innerText.replace(/\n{2,}/g,'\n').trim();
+const PII = /\d{6,}|電話|WhatsApp|身份證|住址/i;
+const BRAND = /星巴克|Starbucks|太平洋咖啡|Pacific ?Coffee|麥當勞|McDonald|Costa|Tim ?Hortons|Blue ?Bottle|Luckin|瑞幸/i;
+
+function renderBox(){
+  $('box').innerHTML = dirty ? saved : promptHtml();
+  $('dirty').hidden = !dirty;
+  const a = F1.filter(has).length, b = F2.filter(has).length;
+  $('dcount').textContent = advOn ? '基商 ' + a + '/7 · 進階 ' + b + '/6' : '已加 ' + a + ' / 7 樣';
+  $('legend').hidden = !advOn;
+  const ab = $('adv'); ab.textContent = advOn ? '🔓' : '🔒'; ab.style.opacity = advOn ? '1' : '';
+  const t = textOf($('box')), w = [];
+  if (PII.test(t)) w.push('⚠ 好似有個人資料,請刪走');
+  if (BRAND.test(t)) w.push('⚠ 唔好用現有品牌名,改做自己諗嘅');
+  $('warn').textContent = w.join('  ');
+}
+function renderDots(){
+  const box = $('dots'); box.innerHTML = '';
+  LIST().forEach((f, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'dot';
+    if (isDone(f)) b.classList.add('done'); else if (has(f)) b.classList.add('part');
+    if (cur === i) b.classList.add('cur');
+    if (f.adv && !isDone(f) && !has(f)) b.style.borderColor = 'var(--pop)';
+    b.textContent = isDone(f) ? '✔' : String(i + 1);
+    b.setAttribute('aria-label', '第 ' + (i + 1) + ' 步:' + f.label);
+    b.addEventListener('click', () => { cur = i; renderStep(); });
+    box.appendChild(b);
+  });
+  const e = document.createElement('button'); e.type = 'button'; e.className = 'dot'; e.textContent = '🏁';
+  e.setAttribute('aria-label', '完成頁'); if (cur === LIST().length) e.classList.add('cur');
+  e.addEventListener('click', () => { cur = LIST().length; renderStep(); });
+  box.appendChild(e);
+}
+function chipsFor(f, wrap){
+  let items = f.opts.slice();
+  if (f.type === 'multi') S[f.key].forEach(x => { if (!items.some(o => o.v === x)) items.push(O(x)); });
+  items.forEach(o => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip';
+    const on = f.type === 'multi' ? S[f.key].includes(o.v) : S[f.key] === o.v;
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.textContent = (o.e ? o.e + ' ' : '') + o.l;
+    b.addEventListener('click', () => pick(f, o.v));
+    wrap.appendChild(b);
+  });
+}
+function pick(f, val){
+  let adv = false;
+  if (f.type === 'multi'){ const r = toggleIn(S[f.key], val, f.need); adv = r === 'on' && S[f.key].length >= f.need; }
+  else { if (S[f.key] === val) S[f.key] = ''; else { S[f.key] = val; adv = true; } }
+  renderBox(); renderStep();
+}
+function autoNext(ms){
+  clearTimeout(advTimer); const c = cur;
+  advTimer = setTimeout(() => { if (cur === c && c < LIST().length) go(1); }, ms);
+}
+function go(d){ cur = Math.max(0, Math.min(LIST().length, cur + d)); renderStep(); }
+function renderStep(){
+  renderDots();
+  const q = $('q'); q.innerHTML = '';
+  if (cur < LIST().length){
+    const f = LIST()[cur];
+    const h = document.createElement('h2');
+    h.innerHTML = '<span class="stepno">第 ' + (cur + 1) + ' 步</span><span>' + f.icon + ' ' + esc(f.label) + '</span>';
+    if (f.type === 'multi'){ const c = document.createElement('span'); c.className = 'cnt'; c.textContent = '(' + S[f.key].length + ' / ' + f.need + ')'; h.appendChild(c); }
+    const tg = document.createElement('span'); tg.className = f.adv ? 'badge' : 'cnt'; tg.textContent = f.adv ? '⭐ 進階指示' : '基商內容'; h.appendChild(tg);
+    q.appendChild(h);
+    if (f.adv && cur === F1.length){
+      const n = document.createElement('div'); n.className = 'notice'; n.textContent = '基商內容完成!由呢度開始係進階指示,會令 AI 做得更似你想要。'; q.appendChild(n);
+    }
+    if (f.hint){ const p = document.createElement('p'); p.className = 'hint'; p.textContent = f.hint; q.appendChild(p); }
+    
+    if (true){
+      const wl = document.createElement('p'); wl.className = 'writelab'; wl.textContent = '✍️ 自己寫寫睇(可以唔寫)'; q.appendChild(wl);
+      const row = document.createElement('div'); row.className = 'row';
+      const inp = document.createElement('input'); inp.type = 'text'; inp.id = 'inp';
+      inp.placeholder = f.type === 'multi' ? '撳下面提示,或者自己寫(用「、」分開)' : (f.ph || '自己寫寫睇…'); inp.setAttribute('aria-label', f.ph || f.label);
+      inp.value = f.type === 'multi' ? S[f.key].join('、') : S[f.key];
+      row.appendChild(inp);
+      const refresh = () => { const w = $('chipwrap'); w.innerHTML = ''; chipsFor(f, w); };
+      inp.addEventListener('input', () => {
+        if (f.type === 'multi') S[f.key] = inp.value.split(/[、,，]/).map(x => x.trim()).filter(Boolean).slice(0, f.need);
+        else S[f.key] = inp.value.trim();
+        clearTimeout(advTimer); renderBox(); refresh(); renderDots(); setNav();
+        const c = document.querySelector('#q h2 .cnt'); if (c && f.type === 'multi') c.textContent = '(' + S[f.key].length + ' / ' + f.need + ')';
+      });
+      q.appendChild(row);
+    }
+    const hl = document.createElement('p'); hl.className = 'hint'; hl.textContent = '撳下面提示,字會跳入上面格,可以再改:'; q.appendChild(hl);
+    const wrap = document.createElement('div'); wrap.className = 'chips'; wrap.id = 'chipwrap'; q.appendChild(wrap); chipsFor(f, wrap);
+    const sk = document.createElement('p'); sk.className = 'hint'; sk.textContent = '唔想加就撳「跳過」,指令就會少咗呢樣。'; q.appendChild(sk);
+  } else renderFinish(q);
+  setNav();
+}
+function setNav(){
+  $('prev').disabled = cur === 0;
+  const nx = $('next');
+  if (cur < LIST().length){ nx.hidden = false; nx.textContent = has(LIST()[cur]) ? '下一步 →' : '跳過 →'; } else nx.hidden = true;
+}
+function renderFinish(q){
+  const h = document.createElement('h2'); h.textContent = '🎉 指令搞掂!'; q.appendChild(h);
+  const ul = document.createElement('ul'); ul.className = 'sum';
+  LIST().forEach((f, idx) => {
+    const li = document.createElement('li'); if (!has(f)) li.className = 'skip';
+    const l = document.createElement('span'); l.className = 'l'; l.textContent = f.icon + ' ' + f.label;
+    const v = document.createElement('span'); v.className = 'vv';
+    const val = f.type === 'multi' ? S[f.key].join('、') : S[f.key];
+    v.textContent = has(f) ? (f.type === 'single' ? (f.opts.find(o => o.v === val) || {l: val}).l : val) : '(冇揀,指令冇呢樣)';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ghost'; b.textContent = '改';
+    b.addEventListener('click', () => { cur = idx; renderStep(); });
+    li.append(l, v, b); ul.appendChild(li);
+  });
+  q.appendChild(ul);
+  const p = document.createElement('p'); p.className = 'hint';
+  p.textContent = '撳最上面「複製指令」,去 Gemini 長按輸入格,撳「貼上」。'; q.appendChild(p);
+
+}
+
+let tt;
+function flash(msg, bad){
+  const t = $('toast'); t.textContent = msg; t.style.color = bad ? 'var(--warn)' : 'var(--good)';
+  clearTimeout(tt); tt = setTimeout(() => { t.textContent = ''; }, 4500);
+}
+$('prev').addEventListener('click', () => { clearTimeout(advTimer); go(-1); });
+$('next').addEventListener('click', () => { clearTimeout(advTimer); go(1); });
+$('box').addEventListener('input', () => { dirty = true; saved = $('box').innerHTML; $('dirty').hidden = false; renderBox2(); });
+function renderBox2(){ const t = textOf($('box')), w = [];
+  if (PII.test(t)) w.push('⚠ 好似有個人資料,請刪走');
+  if (BRAND.test(t)) w.push('⚠ 唔好用現有品牌名,改做自己諗嘅');
+  $('warn').textContent = w.join('  '); }
+$('rebuild').addEventListener('click', () => { dirty = false; renderBox(); flash('已重新砌過'); });
+$('copy').addEventListener('click', async () => {
+  const el = $('box'); const text = textOf(el);
+  try { await navigator.clipboard.writeText(text); flash('✔ 已複製!去 Gemini 長按輸入格,撳「貼上」'); }
+  catch (e) {
+    const r = document.createRange(); r.selectNodeContents(el);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    flash('已揀晒文字,請撳「拷貝」', true);
+  }
+});
+function unlock(){
+  if (advOn){ advOn = false; cur = Math.min(cur, LIST().length); renderBox(); renderStep(); flash('已收埋'); return; }
+  advOn = true; cur = F1.length; renderBox(); renderStep(); flash('🔓 已開啟,由第 8 步開始');
+}
+$('adv').addEventListener('click', unlock);
+$('ex').addEventListener('click', () => {
+  advOn = true;
+  Object.assign(S, {name:'TLLF Café', store:'海邊度假風', logo:['太陽花','貓','狗'], hours:'星期一至日 11:00 - 18:00',
+    drinks:['海鹽焦糖鮮奶咖啡','芒果沙冰'], foods:['士多啤梨牛角包','寵物友善小蛋糕'], promo:'陽光與毛孩相伴，全場飲品買一送一！',
+    aud:'親子家庭', art:'可愛手繪插畫', color:'暖黃色同白色', layout:F2[3].opts[0].v, text:['全部文字用繁體中文','字要大同清楚'], size:'A4 直向(貼壁報板)'});
+  cur = LIST().length; dirty = false; renderBox(); renderStep(); flash('已填入範例,可以再改');
+});
+$('reset').addEventListener('click', () => {
+  Object.assign(S, {name:'',store:'',logo:[],hours:'',drinks:[],foods:[],promo:'',aud:'',art:'',color:'',layout:'',text:[],size:''});
+  advOn = false; cur = 0; dirty = false; renderBox(); renderStep(); flash('已重來');
+});
+renderBox(); renderStep();
+</script>
+</body>
+</html>
